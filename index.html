@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>投資儀表板</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111317;
+    --surface2: #181b20;
+    --border: #1e2228;
+    --border2: #2a2f38;
+    --text: #e8eaed;
+    --muted: #6b7280;
+    --accent: #00d4aa;
+    --accent2: #0ea5e9;
+    --red: #f87171;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Noto Sans TC', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+
+  /* Layout */
+  .header { padding: 24px 32px 0; display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .header-left h1 { font-size: 20px; font-weight: 500; letter-spacing: 0.02em; color: var(--text); }
+  .header-left .subtitle { font-size: 12px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+  .refresh-btn { background: var(--surface2); border: 1px solid var(--border2); color: var(--accent); font-family: var(--mono); font-size: 12px; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+  .refresh-btn:hover { background: var(--border2); }
+  .refresh-btn.loading .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .main { padding: 20px 32px 32px; display: flex; flex-direction: column; gap: 20px; }
+
+  /* Summary cards */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .card-value { font-family: var(--mono); font-size: 22px; font-weight: 500; line-height: 1; }
+  .card-sub { font-size: 11px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+  .up { color: var(--green); }
+  .dn { color: var(--red); }
+  .neutral { color: var(--text); }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+  .tab { padding: 8px 18px; font-size: 13px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; font-weight: 400; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: right; padding: 10px 12px; color: var(--muted); font-size: 11px; font-weight: 400; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, th:nth-child(2) { text-align: left; }
+  td { padding: 11px 12px; border-bottom: 1px solid var(--border); text-align: right; font-family: var(--mono); font-size: 12px; vertical-align: middle; }
+  td:first-child { text-align: left; font-family: var(--sans); }
+  td:nth-child(2) { text-align: left; font-family: var(--sans); color: var(--muted); font-size: 11px; }
+  tr:hover td { background: var(--surface2); }
+  .tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 4px; font-family: var(--sans); font-weight: 500; margin-left: 6px; }
+  .tag-core { background: rgba(0,212,170,0.12); color: var(--accent); }
+
+  /* Industry pie */
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .chart-card h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; font-weight: 400; }
+  .industry-list { display: flex; flex-direction: column; gap: 8px; }
+  .industry-row { display: flex; align-items: center; gap: 10px; }
+  .industry-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .industry-name { font-size: 12px; flex: 1; }
+  .industry-bar-wrap { width: 100px; height: 4px; background: var(--border2); border-radius: 2px; }
+  .industry-bar { height: 4px; border-radius: 2px; transition: width 0.5s ease; }
+  .industry-pct { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 38px; text-align: right; }
+
+  /* Status */
+  .status-bar { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .status-dot.loading { background: var(--yellow); animation: pulse 1s ease-in-out infinite; }
+  .status-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  .error-msg { color: var(--red); font-size: 11px; font-family: var(--mono); }
+  .loading-row td { color: var(--muted); font-style: italic; }
+
+  /* Realized PnL section */
+  .realized-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .realized-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .realized-item .name { font-size: 12px; color: var(--muted); }
+  .realized-item .val { font-family: var(--mono); font-size: 13px; }
+
+  @media (max-width: 700px) {
+    .main, .header { padding-left: 16px; padding-right: 16px; }
+    .chart-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>投資組合儀表板</h1>
+    <div class="subtitle" id="last-update">載入中...</div>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <div class="status-bar"><div class="status-dot loading" id="status-dot"></div><span id="status-text">正在抓取股價...</span></div>
+    <button class="refresh-btn" onclick="loadAll()"><span class="spin" id="spin-icon">↻</span> 重新整理</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Summary -->
+  <div class="summary-grid" id="summary-grid">
+    <div class="card"><div class="card-label">總持有市值</div><div class="card-value neutral" id="s-total">—</div><div class="card-sub" id="s-total-sub">台幣換算</div></div>
+    <div class="card" style="border-color:#1e3a2f"><div class="card-label" style="color:#00d4aa">2026 總損益</div><div class="card-value" id="s-2026total">—</div><div class="card-sub" id="s-2026total-pct">未實現＋已實現</div></div>
+    <div class="card" style="border-color:#1e3a2f"><div class="card-label" style="color:#00d4aa">2026 已實現損益</div><div class="card-value" id="s-2026real">—</div><div class="card-sub">今年出清的獲利</div></div>
+    <div class="card"><div class="card-label">2025 全年損益</div><div class="card-value" id="s-2025">—</div><div class="card-sub">30.20% 全年報酬率</div></div>
+    <div class="card"><div class="card-label">今日美元匯率</div><div class="card-value neutral" id="s-rate">—</div><div class="card-sub" id="s-us-sub">美股市值 USD</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('tw')">台股主動</div>
+      <div class="tab" onclick="switchTab('etf')">台股被動</div>
+      <div class="tab" onclick="switchTab('us')">美股</div>
+      <div class="tab" onclick="switchTab('realized')">已實現損益</div>
+      <div class="tab" onclick="switchTab('industry')">產業分布</div>
+    </div>
+
+    <!-- Taiwan Active -->
+    <div class="tab-content active" id="tab-tw">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>代碼 / 名稱</th><th>產業</th>
+            <th>股數</th><th>均價</th><th>現價</th>
+            <th>目前市值</th>
+            <th style="color:#00d4aa">2026損益</th>
+            <th style="color:#00d4aa">2026報酬率</th>
+            <th>2025損益</th>
+          </tr></thead>
+          <tbody id="tw-tbody"><tr class="loading-row"><td colspan="9">載入中...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ETF -->
+    <div class="tab-content" id="tab-etf">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>代碼 / 名稱</th><th></th>
+            <th>股數</th><th>均價</th><th>現價</th>
+            <th>目前市值</th>
+            <th style="color:#00d4aa">2026損益</th>
+            <th style="color:#00d4aa">2026報酬率</th>
+            <th>2025損益</th>
+          </tr></thead>
+          <tbody id="etf-tbody"><tr class="loading-row"><td colspan="9">載入中...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- US Stocks -->
+    <div class="tab-content" id="tab-us">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>代碼 / 名稱</th><th></th>
+            <th>股數</th><th>均價(USD)</th><th>現價(USD)</th>
+            <th>市值(USD)</th>
+            <th style="color:#00d4aa">2026損益(USD)</th>
+            <th style="color:#00d4aa">2026報酬率</th>
+            <th>2025損益(USD)</th>
+          </tr></thead>
+          <tbody id="us-tbody"><tr class="loading-row"><td colspan="9">載入中...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Realized PnL -->
+    <div class="tab-content" id="tab-realized">
+      <div style="padding: 16px 0;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">已出掉但有損益紀錄的持股</div>
+        <div class="realized-grid" id="realized-grid"></div>
+      </div>
+    </div>
+
+    <!-- Industry -->
+    <div class="tab-content" id="tab-industry">
+      <div class="chart-row" style="margin-top:16px;">
+        <div class="chart-card">
+          <h3>產業分布（依市值）</h3>
+          <div class="industry-list" id="industry-list"></div>
+        </div>
+        <div class="chart-card">
+          <h3>資產配置</h3>
+          <div class="industry-list" id="allocation-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ====== DATA ======
+// base2025: 2025年底市值（2026年損益的基準點）；0 = 2026年新買
+// inv2026:  2026年新增投入（加碼）
+// pnl2025:  2025年累計報酬（靜態，來自Excel）
+// 2026未實現損益公式 = 目前市值 - base2025 - inv2026
+// 2026單年報酬率   = 2026未實現 ÷ (base2025 + inv2026)
+
+const TW_ACTIVE = [
+  { code:'2330', name:'台積電', shares:734,  cost:1001292, avg:1364.16, industry:'半導體', core:true,  base2025:703700,  inv2026:520003, pnl2025:217367, fallback:2255 },
+  { code:'2383', name:'台光電', shares:259,  cost:415862,  avg:1605.64, industry:'PCB',    core:true,  base2025:245105,  inv2026:296368, pnl2025:125611, fallback:5005 },
+  { code:'5274', name:'信驊',   shares:64,   cost:299416,  avg:4678.38, industry:'BMC',    core:true,  base2025:421080,  inv2026:13140,  pnl2025:200616, fallback:17780 },
+  { code:'6442', name:'光聖',   shares:333,  cost:417282,  avg:1253.10, industry:'矽光子', core:false, base2025:272000,  inv2026:280555, pnl2025:135273, fallback:1875 },
+  { code:'2345', name:'智邦',   shares:320,  cost:236600,  avg:739.38,  industry:'網通',   core:false, base2025:379200,  inv2026:0,      pnl2025:142600, fallback:2470 },
+  { code:'3081', name:'聯亞',   shares:278,  cost:284488,  avg:1023.34, industry:'矽光子', core:true,  base2025:0,       inv2026:284488, pnl2025:0,      fallback:2710 },
+  { code:'3017', name:'奇鋐',   shares:267,  cost:337038,  avg:1262.31, industry:'散熱',   core:false, base2025:333710,  inv2026:93654,  pnl2025:97173,  fallback:2545 },
+  { code:'3037', name:'欣興',   shares:670,  cost:304735,  avg:454.83,  industry:'PCB',    core:false, base2025:0,       inv2026:304735, pnl2025:0,      fallback:970 },
+  { code:'6223', name:'旺矽',   shares:105,  cost:315169,  avg:3001.61, industry:'測試',   core:true,  base2025:157500,  inv2026:202011, pnl2025:44342,  fallback:6035 },
+  { code:'4991', name:'環宇',   shares:900,  cost:306734,  avg:340.82,  industry:'矽光子', core:true,  base2025:0,       inv2026:306734, pnl2025:0,      fallback:814 },
+  { code:'3491', name:'昇達科', shares:140,  cost:212323,  avg:1516.59, industry:'低軌衛星',core:true, base2025:0,       inv2026:212323, pnl2025:0,      fallback:1930 },
+  { code:'2308', name:'台達電', shares:100,  cost:147206,  avg:1472.06, industry:'電源',   core:false, base2025:0,       inv2026:147206, pnl2025:0,      fallback:2095 },
+  { code:'6291', name:'沛亨',   shares:520,  cost:190288,  avg:365.94,  industry:'矽光子', core:true,  base2025:0,       inv2026:190288, pnl2025:0,      fallback:541 },
+  { code:'2360', name:'致茂',   shares:83,   cost:185807,  avg:2238.64, industry:'測試',   core:false, base2025:0,       inv2026:185807, pnl2025:0,      fallback:2270 },
+  { code:'6510', name:'精測',   shares:60,   cost:203587,  avg:3393.12, industry:'測試',   core:false, base2025:0,       inv2026:203587, pnl2025:0,      fallback:3405 },
+];
+
+const TW_ETF = [
+  { code:'0050',   name:'台灣50',    shares:24676, cost:1078497, avg:43.71, base2025:1618746, inv2026:0,      pnl2025:540249, realized2026:0,    fallback:97.3  },
+  { code:'00631L', name:'台灣50正2', shares:36440, cost:795346,  avg:21.83, base2025:0,       inv2026:795346, pnl2025:0,      realized2026:11482, fallback:32.56 },
+];
+
+const US_STOCKS = [
+  { code:'QQQ',  name:'QQQ',      shares:28.04433, cost:14030.0, avg:500.28, base2025:17227.91, inv2026:0,       pnl2025:3197.91, fallback:717.54  },
+  { code:'SMH',  name:'SMH',      shares:18.01903, cost:6281.2,  avg:348.59, base2025:3241.17,  inv2026:3408.59, pnl2025:375.52,  fallback:576.32  },
+  { code:'TSM',  name:'TSMC',     shares:6,        cost:1736.2,  avg:289.37, base2025:1823.34,  inv2026:0,       pnl2025:87.14,   fallback:404.52  },
+  { code:'MU',   name:'Micron',   shares:4,        cost:1518.89, avg:379.72, base2025:0,        inv2026:1518.89, pnl2025:0,       fallback:751.0   },
+  { code:'SNDK', name:'Sandisk',  shares:2,        cost:940.0,   avg:470.0,  base2025:0,        inv2026:940.0,   pnl2025:0,       fallback:1478.68 },
+  { code:'AXTI', name:'AXT',      shares:28,       cost:1034.8,  avg:36.96,  base2025:0,        inv2026:1034.8,  pnl2025:0,       fallback:140.83  },
+  { code:'LITE', name:'Lumentum', shares:2,        cost:1376.33, avg:688.17, base2025:0,        inv2026:1376.33, pnl2025:0,       fallback:946.9   },
+];
+
+const REALIZED = [
+  { code:'3324',   name:'雙鴻',             pnl2025:11918,  pnl2026:9710   },
+  { code:'6515',   name:'穎崴',             pnl2025:0,      pnl2026:-13373 },
+  { code:'00757',  name:'統一FANG',         pnl2025:26076,  pnl2026:23589  },
+  { code:'2368',   name:'金像電',           pnl2025:26821,  pnl2026:3771   },
+  { code:'7769',   name:'鴻勁',             pnl2025:30400,  pnl2026:57239  },
+  { code:'6944',   name:'兆聯實業',         pnl2025:11300,  pnl2026:7863   },
+  { code:'00981A', name:'主動統一台股增長', pnl2025:6216,   pnl2026:6279   },
+  { code:'8299',   name:'群聯',             pnl2025:4146,   pnl2026:-22138 },
+  { code:'2344',   name:'華邦電',           pnl2025:1814,   pnl2026:19096  },
+  { code:'2408',   name:'南亞科',           pnl2025:0,      pnl2026:-15200 },
+  { code:'2313',   name:'華通',             pnl2025:0,      pnl2026:5735   },  // 已實現 +5,735（非未實現）
+  { code:'3653',   name:'健策',             pnl2025:16121,  pnl2026:60176  },
+];
+
+// ====== STATE ======
+let prices = {};
+let stalePrices = new Set();  // moved here so it's accessible globally
+let usdRate = null;
+
+// Pre-fill prices with fallback values from Excel (shown immediately on load)
+function initFallbackPrices() {
+  const all = [...TW_ACTIVE, ...TW_ETF, ...US_STOCKS];
+  for (const s of all) {
+    prices[s.code] = s.fallback;
+    stalePrices.add(s.code);  // mark all as stale initially
+  }
+}
+
+// ====== UTILS ======
+const fmt = (n, dec=0) => n == null ? '—' : Number(n).toLocaleString('zh-TW', {minimumFractionDigits:dec, maximumFractionDigits:dec});
+const fmtPct = (n) => n == null ? '—' : (n >= 0 ? '+' : '') + (n*100).toFixed(2) + '%';
+const colorClass = (n) => n > 0 ? 'up' : n < 0 ? 'dn' : 'neutral';
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function setStatus(state, msg) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'status-dot' + (state === 'ok' ? '' : state === 'error' ? ' error' : ' loading');
+  txt.textContent = msg;
+}
+
+// ====== FETCH EXCHANGE RATE ======
+async function fetchUSDRate() {
+  try {
+    // Try multiple free sources
+    const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    const data = await res.json();
+    usdRate = data.rates.TWD;
+    return usdRate;
+  } catch(e) {
+    try {
+      const res2 = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data2 = await res2.json();
+      usdRate = data2.rates.TWD;
+      return usdRate;
+    } catch(e2) {
+      usdRate = 32.5; // fallback
+      return usdRate;
+    }
+  }
+}
+
+// ====== FETCH STOCK PRICES ======
+// Strategy: try direct → CORS proxy 1 → CORS proxy 2 → use previousClose fallback
+// This ensures we always show a price (昨天收盤) rather than blank
+
+const CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+
+async function tryFetch(url) {
+  // 1. Direct (works on GitHub Pages / deployed)
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) return await res.json();
+  } catch(e) {}
+
+  // 2. Try each CORS proxy
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const res = await fetch(proxy(url), { signal: AbortSignal.timeout(5000) });
+      if (res.ok) return await res.json();
+    } catch(e) {}
+  }
+  return null;
+}
+
+async function fetchPrice(symbol, isTW) {
+  const ticker = isTW ? symbol + '.TW' : symbol;
+  // range=5d so we always get at least previousClose even if market closed
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`;
+
+  const data = await tryFetch(url);
+  if (!data) return null;
+
+  const result = data?.chart?.result?.[0];
+  if (!result) return null;
+  const meta = result.meta;
+
+  // Priority: live price → today's close → previous close (昨天收盤)
+  const price = meta.regularMarketPrice
+    || meta.chartPreviousClose
+    || meta.previousClose
+    || null;
+
+  return price;
+}
+
+// Source label: know if price is live or previous close
+async function fetchPriceWithMeta(symbol, isTW) {
+  const ticker = isTW ? symbol + '.TW' : symbol;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=5d`;
+
+  const data = await tryFetch(url);
+  if (!data) return { price: null, stale: false };
+
+  const result = data?.chart?.result?.[0];
+  if (!result) return { price: null, stale: false };
+  const meta = result.meta;
+
+  const live = meta.regularMarketPrice;
+  const prev = meta.chartPreviousClose || meta.previousClose;
+
+  if (live) return { price: live, stale: false };
+  if (prev) return { price: prev, stale: true };  // 昨天收盤價
+  return { price: null, stale: false };
+}
+
+// Batch fetch — overwrites fallback prices with real API data
+async function fetchAllPrices() {
+  const all = [
+    ...TW_ACTIVE.map(s => ({ ...s, isTW: true })),
+    ...TW_ETF.map(s => ({ ...s, isTW: true })),
+    ...US_STOCKS.map(s => ({ ...s, isTW: false })),
+  ];
+
+  const BATCH = 3;
+  for (let i = 0; i < all.length; i += BATCH) {
+    const batch = all.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (s) => {
+      const { price, stale } = await fetchPriceWithMeta(s.code, s.isTW);
+      if (price !== null) {
+        prices[s.code] = price;
+        if (stale) {
+          stalePrices.add(s.code);
+        } else {
+          stalePrices.delete(s.code);  // live price — remove stale flag
+        }
+      }
+      // if price === null, keep existing fallback price in prices[]
+    }));
+    if (i + BATCH < all.length) await sleep(300);
+  }
+}
+
+// ====== RENDER ======
+function renderTWTable(data, tbodyId) {
+  const tbody = document.getElementById(tbodyId);
+  let html = '';
+  let totalMV = 0, totalBase2025 = 0, totalInv2026 = 0, totalPnl2025 = 0;
+
+  for (const s of data) {
+    const price = prices[s.code];
+    const mv = price != null ? price * s.shares : null;
+
+    // 2026損益 = 目前市值 - 2025底市值 - 2026新投入
+    const base = s.base2025 + s.inv2026;   // 今年的成本基準
+    const pnl2026 = mv != null ? mv - base : null;
+    const pct2026 = (pnl2026 != null && base > 0) ? pnl2026 / base : null;
+
+    if (mv) {
+      totalMV       += mv;
+      totalBase2025 += s.base2025;
+      totalInv2026  += s.inv2026;
+    }
+    totalPnl2025 += (s.pnl2025 || 0);
+
+    const isStale = stalePrices.has(s.code);
+    const priceStr = price != null
+      ? fmt(price) + (isStale ? ' <span style="color:var(--muted);font-size:10px" title="昨日收盤價">昨</span>' : '')
+      : '<span style="color:var(--muted)">—</span>';
+    const mvStr    = mv      != null ? fmt(mv)      : '—';
+    const pnl26Str = pnl2026 != null ? `<span class="${colorClass(pnl2026)}">${pnl2026 >= 0 ? '+' : ''}${fmt(pnl2026)}</span>` : '—';
+    const pct26Str = pct2026 != null ? `<span class="${colorClass(pct2026)}">${fmtPct(pct2026)}</span>` : '—';
+    const pnl25Str = s.pnl2025 ? `<span class="${colorClass(s.pnl2025)}" style="font-size:11px">${s.pnl2025 >= 0 ? '+' : ''}${fmt(s.pnl2025)}</span>` : '<span style="color:var(--muted)">—</span>';
+    const coreTag  = s.core ? '<span class="tag tag-core">Core</span>' : '';
+
+    html += `<tr>
+      <td><strong>${s.code}</strong>${coreTag}</td>
+      <td>${s.name} ${s.industry ? `<span style="color:var(--muted);font-size:10px">${s.industry}</span>` : ''}</td>
+      <td>${fmt(s.shares)}</td>
+      <td>${fmt(s.avg)}</td>
+      <td>${priceStr}</td>
+      <td>${mvStr}</td>
+      <td>${pnl26Str}</td>
+      <td>${pct26Str}</td>
+      <td>${pnl25Str}</td>
+    </tr>`;
+  }
+
+  // Total row
+  const totalBase = totalBase2025 + totalInv2026;
+  const totalPnl2026 = totalMV - totalBase;
+  const totalPct2026 = totalBase > 0 ? totalPnl2026 / totalBase : 0;
+  html += `<tr style="background:var(--surface2); font-weight:500; border-top:1px solid var(--border2)">
+    <td colspan="4" style="color:var(--muted);font-size:11px;font-family:var(--mono)">合計</td>
+    <td></td>
+    <td>${fmt(totalMV)}</td>
+    <td><span class="${colorClass(totalPnl2026)}">${totalPnl2026 >= 0 ? '+' : ''}${fmt(totalPnl2026)}</span></td>
+    <td><span class="${colorClass(totalPct2026)}">${fmtPct(totalPct2026)}</span></td>
+    <td><span class="${colorClass(totalPnl2025)}" style="font-size:11px">${totalPnl2025 >= 0 ? '+' : ''}${fmt(totalPnl2025)}</span></td>
+  </tr>`;
+
+  tbody.innerHTML = html;
+  return { mv: totalMV, base2025: totalBase2025, inv2026: totalInv2026, pnl2025: totalPnl2025 };
+}
+
+function renderUSTable() {
+  const tbody = document.getElementById('us-tbody');
+  let html = '';
+  let totalMV = 0, totalBase2025 = 0, totalInv2026 = 0, totalPnl2025 = 0;
+
+  for (const s of US_STOCKS) {
+    const price = prices[s.code];
+    const mv = price != null ? price * s.shares : null;
+    const base = s.base2025 + s.inv2026;
+    const pnl2026 = mv != null ? mv - base : null;
+    const pct2026 = (pnl2026 != null && base > 0) ? pnl2026 / base : null;
+
+    if (mv) {
+      totalMV       += mv;
+      totalBase2025 += s.base2025;
+      totalInv2026  += s.inv2026;
+    }
+    totalPnl2025 += (s.pnl2025 || 0);
+
+    const isStale = stalePrices.has(s.code);
+    const priceStr = price != null
+      ? `$${price.toFixed(2)}` + (isStale ? ' <span style="color:var(--muted);font-size:10px" title="昨日收盤價">昨</span>' : '')
+      : '<span style="color:var(--muted)">—</span>';
+    const mvStr    = mv      != null ? `$${mv.toFixed(2)}`                 : '—';
+    const pnl26Str = pnl2026 != null ? `<span class="${colorClass(pnl2026)}">${pnl2026 >= 0 ? '+$' : '-$'}${Math.abs(pnl2026).toFixed(2)}</span>` : '—';
+    const pct26Str = pct2026 != null ? `<span class="${colorClass(pct2026)}">${fmtPct(pct2026)}</span>` : '—';
+    const pnl25Str = s.pnl2025 ? `<span class="${colorClass(s.pnl2025)}" style="font-size:11px">${s.pnl2025 >= 0 ? '+$' : '-$'}${Math.abs(s.pnl2025).toFixed(2)}</span>` : '<span style="color:var(--muted)">—</span>';
+
+    html += `<tr>
+      <td><strong>${s.code}</strong></td>
+      <td>${s.name}</td>
+      <td>${s.shares % 1 === 0 ? s.shares : s.shares.toFixed(5)}</td>
+      <td>$${s.avg.toFixed(2)}</td>
+      <td>${priceStr}</td>
+      <td>${mvStr}</td>
+      <td>${pnl26Str}</td>
+      <td>${pct26Str}</td>
+      <td>${pnl25Str}</td>
+    </tr>`;
+  }
+
+  const totalBase = totalBase2025 + totalInv2026;
+  const totalPnl2026 = totalMV - totalBase;
+  const totalPct2026 = totalBase > 0 ? totalPnl2026 / totalBase : 0;
+  html += `<tr style="background:var(--surface2); font-weight:500; border-top:1px solid var(--border2)">
+    <td colspan="4" style="color:var(--muted);font-size:11px;font-family:var(--mono)">合計</td>
+    <td></td>
+    <td>$${totalMV.toFixed(2)}</td>
+    <td><span class="${colorClass(totalPnl2026)}">${totalPnl2026 >= 0 ? '+$' : '-$'}${Math.abs(totalPnl2026).toFixed(2)}</span></td>
+    <td><span class="${colorClass(totalPct2026)}">${fmtPct(totalPct2026)}</span></td>
+    <td><span class="${colorClass(totalPnl2025)}" style="font-size:11px">${totalPnl2025 >= 0 ? '+$' : '-$'}${Math.abs(totalPnl2025).toFixed(2)}</span></td>
+  </tr>`;
+
+  tbody.innerHTML = html;
+  const rate = usdRate || 32.5;
+  document.getElementById('s-rate').textContent = rate.toFixed(2);
+  document.getElementById('s-us-sub').textContent = `美股市值 $${totalMV.toFixed(0)} USD`;
+  return { mv: totalMV, base2025: totalBase2025, inv2026: totalInv2026, pnl2025: totalPnl2025 };
+}
+
+function renderRealized() {
+  const grid = document.getElementById('realized-grid');
+  let html = '';
+  let total = 0;
+  for (const r of REALIZED) {
+    const t = (r.pnl2025 || 0) + (r.pnl2026 || 0);
+    total += t;
+    html += `<div class="realized-item">
+      <div>
+        <div style="font-size:13px; font-weight:500;">${r.name} <span style="color:var(--muted);font-size:11px">${r.code}</span></div>
+        <div class="name">2025: ${r.pnl2025 >= 0 ? '+' : ''}${fmt(r.pnl2025)} ／ 2026: ${r.pnl2026 >= 0 ? '+' : ''}${fmt(r.pnl2026)}</div>
+      </div>
+      <div class="val ${colorClass(t)}">${t >= 0 ? '+' : ''}${fmt(t)}</div>
+    </div>`;
+  }
+  // Total
+  html += `<div class="realized-item" style="border-color:var(--border2); background:var(--surface)">
+    <div style="font-size:13px; font-weight:500;">合計已實現</div>
+    <div class="val ${colorClass(total)}" style="font-size:15px;">${total >= 0 ? '+' : ''}${fmt(total)}</div>
+  </div>`;
+  grid.innerHTML = html;
+  return total;
+}
+
+function renderIndustry() {
+  // Group TW active by industry
+  const industryMap = {};
+  for (const s of TW_ACTIVE) {
+    const price = prices[s.code];
+    const mv = price != null ? price * s.shares : s.cost;
+    const ind = s.industry || '其他';
+    industryMap[ind] = (industryMap[ind] || 0) + mv;
+  }
+
+  const colors = ['#00d4aa','#0ea5e9','#a78bfa','#fb923c','#f472b6','#34d399','#fbbf24','#60a5fa','#e879f9'];
+  const sorted = Object.entries(industryMap).sort((a,b) => b[1]-a[1]);
+  const total = sorted.reduce((s,[,v]) => s+v, 0);
+
+  const list = document.getElementById('industry-list');
+  list.innerHTML = sorted.map(([name, val], i) => {
+    const pct = total > 0 ? val/total : 0;
+    return `<div class="industry-row">
+      <div class="industry-dot" style="background:${colors[i%colors.length]}"></div>
+      <div class="industry-name">${name}</div>
+      <div class="industry-bar-wrap"><div class="industry-bar" style="width:${(pct*100).toFixed(1)}%;background:${colors[i%colors.length]}"></div></div>
+      <div class="industry-pct">${(pct*100).toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAllocation(twActiveMV, etfMV, usMV) {
+  const twMV = twActiveMV + etfMV;
+  const usMVTW = usMV * (usdRate || 32.5);
+  const grand = twMV + usMVTW;
+
+  const items = [
+    { name: '台股主動', val: twActiveMV, color: '#00d4aa' },
+    { name: '台股被動 ETF', val: etfMV, color: '#0ea5e9' },
+    { name: '美股 (換算台幣)', val: usMVTW, color: '#a78bfa' },
+  ];
+
+  const list = document.getElementById('allocation-list');
+  list.innerHTML = items.map(item => {
+    const pct = grand > 0 ? item.val/grand : 0;
+    return `<div class="industry-row">
+      <div class="industry-dot" style="background:${item.color}"></div>
+      <div class="industry-name">${item.name}</div>
+      <div class="industry-bar-wrap"><div class="industry-bar" style="width:${(pct*100).toFixed(1)}%;background:${item.color}"></div></div>
+      <div class="industry-pct">${(pct*100).toFixed(1)}%</div>
+    </div>`;
+  }).join('');
+}
+
+function renderSummary(twActive, etf, us) {
+  const rate = usdRate || 32.5;
+  const usMVtw = us.mv * rate;
+  const totalMV = twActive.mv + etf.mv + usMVtw;
+
+  // 靜態 fallback（來自Excel，以2025底為基準的未實現）
+  const STATIC_TW_UNREAL  = 4353766;   // 台股主動 2026未實現
+  const STATIC_ETF_UNREAL = 1173370;   // ETF 2026未實現
+  const STATIC_US_UNREAL_USD = 14323;  // 美股 2026未實現(USD)
+  const STATIC_UNREAL_TOTAL = STATIC_TW_UNREAL + STATIC_ETF_UNREAL + STATIC_US_UNREAL_USD * rate;
+
+  // 動態計算 2026未實現（只有股價都抓到時才可靠）
+  const tw2026unreal  = twActive.mv - (twActive.base2025 + twActive.inv2026);
+  const etf2026unreal = etf.mv      - (etf.base2025      + etf.inv2026);
+  const us2026unreal  = (us.mv      - (us.base2025        + us.inv2026)) * rate;
+  const dynamic2026unreal = tw2026unreal + etf2026unreal + us2026unreal;
+
+  // 判斷股價有沒有成功載入（至少台股主動要有幾檔）
+  const priceCount = Object.keys(prices).length;
+  const total2026unreal = priceCount >= 5 ? dynamic2026unreal : STATIC_UNREAL_TOTAL;
+  const usingStatic = priceCount < 5;
+
+  // 已實現2026（靜態）
+  const realized2026 = REALIZED.reduce((s, r) => s + (r.pnl2026 || 0), 0) + 11482;
+
+  // 2026 總損益
+  const total2026 = total2026unreal + realized2026;
+
+  // 報酬率基準
+  const base2026 = (twActive.base2025 + twActive.inv2026)
+                 + (etf.base2025      + etf.inv2026)
+                 + (us.base2025       + us.inv2026) * rate;
+  // 用靜態基準避免 base=0 問題
+  const STATIC_BASE = 3341906 + (1618746 + 795346) + (22322) * rate;
+  const pct2026 = (base2026 > 1000 ? base2026 : STATIC_BASE) > 0
+    ? total2026 / (base2026 > 1000 ? base2026 : STATIC_BASE) : 0;
+
+  // 2025 全年損益（靜態）
+  const pnl2025 = 1864806;
+
+  // 更新 DOM
+  const totalMVDisplay = totalMV > 1000 ? totalMV : null;
+  document.getElementById('s-total').textContent = totalMVDisplay ? 'NT$' + fmt(totalMVDisplay) : '載入中...';
+  document.getElementById('s-total-sub').textContent = `台幣換算（匯率 ${rate.toFixed(2)}）`;
+
+  const t26el = document.getElementById('s-2026total');
+  t26el.textContent = (total2026 >= 0 ? '+' : '') + 'NT$' + fmt(Math.abs(total2026));
+  t26el.className = 'card-value ' + colorClass(total2026);
+  const unrealLabel = usingStatic ? '未實現 ' : '未實現 ';
+  document.getElementById('s-2026total-pct').textContent =
+    fmtPct(pct2026) + '　未實現 ' + (total2026unreal >= 0 ? '+' : '') + fmt(total2026unreal)
+    + (usingStatic ? '＊' : '') + '　已實現 +' + fmt(realized2026);
+
+  const r26el = document.getElementById('s-2026real');
+  r26el.textContent = '+NT$' + fmt(realized2026);
+  r26el.className = 'card-value up';
+
+  const p25el = document.getElementById('s-2025');
+  p25el.textContent = '+NT$' + fmt(pnl2025);
+  p25el.className = 'card-value up';
+  p25el.parentElement.querySelector('.card-sub').textContent = '+30.20% 全年報酬率';
+}
+
+// ====== TABS ======
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['tw','etf','us','realized','industry'][i] === id));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+// ====== MAIN LOAD ======
+async function loadAll() {
+  const btn = document.querySelector('.refresh-btn');
+  btn.disabled = true;
+  document.getElementById('spin-icon').classList.add('loading');
+  setStatus('loading', '正在抓取最新股價...');
+
+  // Step 1: 立刻用 fallback 股價渲染，讓畫面馬上有數字
+  initFallbackPrices();
+  {
+    const twRes  = renderTWTable(TW_ACTIVE, 'tw-tbody');
+    const etfRes = renderTWTable(TW_ETF, 'etf-tbody');
+    const usRes  = renderUSTable();
+    renderRealized();
+    renderIndustry();
+    renderAllocation(twRes.mv, etfRes.mv, usRes.mv);
+    renderSummary(twRes, etfRes, usRes);
+  }
+  document.getElementById('last-update').textContent = '顯示 Excel 最後記錄價，更新中...';
+
+  // Step 2: 背景抓取即時/昨收股價，回來後重新渲染
+  const [rate] = await Promise.all([
+    fetchUSDRate(),
+    fetchAllPrices(),
+  ]);
+
+  usdRate = rate;
+
+  const twRes  = renderTWTable(TW_ACTIVE, 'tw-tbody');
+  const etfRes = renderTWTable(TW_ETF, 'etf-tbody');
+  const usRes  = renderUSTable();
+  renderRealized();
+  renderIndustry();
+  renderAllocation(twRes.mv, etfRes.mv, usRes.mv);
+  renderSummary(twRes, etfRes, usRes);
+
+  const liveCount  = [...Object.keys(prices)].filter(c => !stalePrices.has(c)).length;
+  const staleCount = stalePrices.size;
+  const total = TW_ACTIVE.length + TW_ETF.length + US_STOCKS.length;
+  const now = new Date().toLocaleString('zh-TW');
+  document.getElementById('last-update').textContent = `最後更新：${now}`;
+
+  if (staleCount === 0) {
+    setStatus('ok', `所有 ${total} 檔即時股價更新完成`);
+  } else if (liveCount > 0) {
+    setStatus('ok', `${liveCount} 檔即時、${staleCount} 檔昨日收盤價`);
+  } else {
+    setStatus('ok', `使用昨日收盤價（共 ${total} 檔）`);
+  }
+
+  document.getElementById('spin-icon').classList.remove('loading');
+  btn.disabled = false;
+}
+
+// Initial load
+loadAll();
+</script>
+</body>
+</html>
