@@ -140,14 +140,14 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>代碼 / 名稱</th><th>產業</th>
+            <th>代碼</th><th>公司</th><th>產業</th>
             <th>股數</th><th>均價</th><th>現價</th>
             <th>目前市值</th>
             <th style="color:#00d4aa">2026損益</th>
             <th style="color:#00d4aa">2026報酬率</th>
             <th>2025損益</th>
           </tr></thead>
-          <tbody id="tw-tbody"><tr class="loading-row"><td colspan="9">載入中...</td></tr></tbody>
+          <tbody id="tw-tbody"><tr class="loading-row"><td colspan="10">載入中...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -220,7 +220,7 @@
 // 2026單年報酬率   = 2026未實現 ÷ (base2025 + inv2026)
 
 const TW_ACTIVE = [
-  { code:'2330', name:'台積電', shares:734,  cost:1001292, avg:1364.16, industry:'半導體', core:true,  base2025:703700,  inv2026:520003, pnl2025:217367, fallback:2255 },
+  { code:'2330', name:'台積電', shares:734,  cost:1001292, avg:1364.16, industry:'半導體製造', core:true,  base2025:703700,  inv2026:520003, pnl2025:217367, fallback:2255 },
   { code:'2383', name:'台光電', shares:259,  cost:415862,  avg:1605.64, industry:'PCB',    core:true,  base2025:245105,  inv2026:296368, pnl2025:125611, fallback:5005 },
   { code:'5274', name:'信驊',   shares:64,   cost:299416,  avg:4678.38, industry:'BMC',    core:true,  base2025:421080,  inv2026:13140,  pnl2025:200616, fallback:17780 },
   { code:'6442', name:'光聖',   shares:333,  cost:417282,  avg:1253.10, industry:'矽光子', core:false, base2025:272000,  inv2026:280555, pnl2025:135273, fallback:1875 },
@@ -443,7 +443,8 @@ function renderTWTable(data, tbodyId) {
 
     html += `<tr>
       <td><strong>${s.code}</strong>${coreTag}</td>
-      <td>${s.name} ${s.industry ? `<span style="color:var(--muted);font-size:10px">${s.industry}</span>` : ''}</td>
+      <td>${s.name}</td>
+      <td>${s.industry ? `<span style="color:var(--muted);font-size:11px">${s.industry}</span>` : '—'}</td>
       <td>${fmt(s.shares)}</td>
       <td>${fmt(s.avg)}</td>
       <td>${priceStr}</td>
@@ -459,7 +460,7 @@ function renderTWTable(data, tbodyId) {
   const totalPnl2026 = totalMV - totalBase;
   const totalPct2026 = totalBase > 0 ? totalPnl2026 / totalBase : 0;
   html += `<tr style="background:var(--surface2); font-weight:500; border-top:1px solid var(--border2)">
-    <td colspan="4" style="color:var(--muted);font-size:11px;font-family:var(--mono)">合計</td>
+    <td colspan="5" style="color:var(--muted);font-size:11px;font-family:var(--mono)">合計</td>
     <td></td>
     <td>${fmt(totalMV)}</td>
     <td><span class="${colorClass(totalPnl2026)}">${totalPnl2026 >= 0 ? '+' : ''}${fmt(totalPnl2026)}</span></td>
